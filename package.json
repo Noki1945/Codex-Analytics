@@ -1,8 +1,8 @@
 {
   "name": "codex-analytics",
   "displayName": "Codex Analytics",
-  "description": "Local Codex operation analytics and evidence-based quota forecasts",
-  "version": "0.1.0",
+  "description": "Локальная аналитика операций Codex и прогнозирование лимитов",
+  "version": "0.1.1",
   "publisher": "codex-analytics-local",
   "license": "MIT",
   "engines": {

@@ -30,4 +30,10 @@ Project paths are hashed but technical session/turn IDs and timestamps remain po
 
 ## Remaining scope
 
+### Alpha 2 refinements
+
+Quota burn now uses total observed percentage-point increase divided by total observed time. The empirical hit frequency is also weighted by interval duration. Snapshots older than five minutes do not produce an exhaustion forecast. Task forecasts use up to the latest 100 compatible observations and reject training volumes outside one quarter to four times the requested volume, limiting unsupported extrapolation. These bounds do not establish real-world accuracy; the deterministic holdout fixture still verifies mechanics only.
+
+Duplicate task records prefer a completed observation over an incomplete copy. Overlap detection uses sorted intervals and a running maximum end time, avoiding the previous full pairwise scan. Token counters must be nonnegative safe integers and cached input cannot exceed total input.
+
 No reliable programming-language or semantic complexity filter exists without a trusted source. No semantic defect count, task-success verifier, causal operation-cost attribution, automatic official pricing feed, real retry-cost allocation or reset purchasing is implemented. These are explicitly unavailable rather than fabricated. A remote GitHub repository and Marketplace publication require account access and a real publisher identity.

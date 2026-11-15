@@ -41,7 +41,12 @@ export function calibrate(a: Window|undefined,b: Window|undefined, flags: string
  return {value,low:Math.max(0,value-1),high:value+1,quality:reasons.length?'aggregate':'bounded',reasons:[...reasons,'Percent rounding: ±1 percentage point; other clients may contribute']};
 }
 export function finalize(tasks: Task[]) {
- tasks=[...new Map(tasks.map(t=>[t.id,t])).values()];
+ const unique=new Map<string,Task>();
+ for(const t of tasks){const old=unique.get(t.id);if(!old||(t.complete&&!old.complete)||((t.complete===old.complete)&&(t.end??t.start)>=(old.end??old.start)))unique.set(t.id,t);}
+ tasks=[...unique.values()].sort((a,b)=>a.start-b.start);
+ let previousEnd=-Infinity;
+ const overlapping=new Set<string>();
+ for(let i=0;i<tasks.length;i++){const t=tasks[i],end=t.end??Infinity;if(previousEnd>t.start||(i+1<tasks.length&&tasks[i+1].start<end))overlapping.add(t.id);previousEnd=Math.max(previousEnd,end);}
  for(const t of tasks) {
   const flags:string[]=[];
   if(!t.complete) flags.push('Incomplete task');
@@ -49,7 +54,7 @@ export function finalize(tasks: Task[]) {
   if(t.modelChanged) flags.push('Model changed');
   if(t.before&&t.start-t.before.at>300000)flags.push('Stale starting snapshot');
   if(t.after&&t.end&&t.end-t.after.at>60000)flags.push('No snapshot near completion');
-  if(tasks.some(o=>o.id!==t.id&&o.start<(t.end??Infinity)&&(o.end??Infinity)>t.start)) flags.push('Overlapping tasks');
+  if(overlapping.has(t.id)) flags.push('Overlapping tasks');
   if(t.categories.length>1) flags.push('Mixed operations: task-level cost only');
   t.five=calibrate(t.before?.five,t.after?.five,flags);t.week=calibrate(t.before?.week,t.after?.week,flags);
  }
@@ -58,11 +63,13 @@ export function finalize(tasks: Task[]) {
 export function burn(snapshots:Limits[],key:'five'|'week',now=Date.now()) {
  const sorted=[...new Map(snapshots.map(s=>[s.at,s])).values()].sort((a,b)=>a.at-b.at);
  const latest=sorted.at(-1),w=latest?.[key];if(!w||w.reset*1000<=now)return undefined;
- const rates:number[]=[];
- for(let i=1;i<sorted.length;i++){const a=sorted[i-1][key],b=sorted[i][key],hours=(sorted[i].at-sorted[i-1].at)/3600000;if(a&&b&&a.reset===b.reset&&a.bucket===b.bucket&&b.used>=a.used&&hours>=1/60&&b.reset===w.reset)rates.push((b.used-a.used)/hours);}
+ if(!latest||now-latest.at>300000)return {status:'Устаревший снимок',n:0};
+ const rates:number[]=[],durations:number[]=[];let used=0,hoursObserved=0;
+ for(let i=1;i<sorted.length;i++){const a=sorted[i-1][key],b=sorted[i][key],hours=(sorted[i].at-sorted[i-1].at)/3600000;if(a&&b&&a.reset===b.reset&&a.bucket===b.bucket&&b.used>=a.used&&hours>=1/60&&b.reset===w.reset){rates.push((b.used-a.used)/hours);durations.push(hours);used+=b.used-a.used;hoursObserved+=hours;}}
  const s=stats(rates);if(!s||s.n<5)return {status:'Недостаточно данных',n:rates.length};
  const remaining=100-w.used,hoursToReset=(w.reset*1000-now)/3600000;
- return {status:'Observed pace estimate',n:s.n,perHour:s.mean,perDay:s.mean*24,exhaustsAt:s.mean>0?now+remaining/s.mean*3600000:undefined,hitBeforeReset:rates.filter(r=>r*hoursToReset>=remaining).length/rates.length,note:'Empirical probability assumes observed pace continues; idle periods and other clients can bias it.'};
+ const pace=used/hoursObserved;
+ return {status:'Оценка наблюдаемого темпа',n:s.n,perHour:pace,perDay:pace*24,exhaustsAt:pace>0?now+remaining/pace*3600000:undefined,hitBeforeReset:rates.reduce((sum,r,i)=>sum+(r*hoursToReset>=remaining?durations[i]:0),0)/hoursObserved,note:'Оценка взвешена по времени наблюдения; предполагается сохранение темпа.'};
 }
 export function quantile(a:number[],p:number) { const s=[...a].sort((x,y)=>x-y),i=(s.length-1)*p;return s.length?s[Math.floor(i)]+(s[Math.ceil(i)]-s[Math.floor(i)])*(i%1):undefined; }
 export function stats(values: number[]) {
@@ -79,8 +86,8 @@ export function normalized(tasks:Task[],key:'five'|'week',unit:Unit,scale=1) {
 }
 export interface ForecastInput {model:string;category:Category;unit:Unit;amount:number;project?:string;retries:number;complexity:number;projectSize?:number}
 export function forecast(tasks:Task[],q:ForecastInput,remaining?:{five?:number;week?:number}) {
- if(!Number.isFinite(q.amount)||q.amount<=0||q.retries<0||q.complexity<=0) throw Error('Invalid forecast input');
- const candidates=tasks.filter(t=>t.complete&&!t.gaps&&!t.modelChanged&&t.model===q.model&&t.categories.length===1&&t.categories[0]===q.category&&(!q.project||t.project===q.project)&& (volume(t,q.unit)??0)>0);
+ if(!Number.isFinite(q.amount)||q.amount<=0||!Number.isFinite(q.retries)||q.retries<0||!Number.isFinite(q.complexity)||q.complexity<=0||q.complexity>5) throw Error('Некорректные параметры прогноза');
+ const candidates=tasks.filter(t=>t.complete&&!t.gaps&&!t.modelChanged&&t.model===q.model&&t.categories.length===1&&t.categories[0]===q.category&&(!q.project||t.project===q.project)&& (volume(t,q.unit)??0)>=q.amount/4&&(volume(t,q.unit)??0)<=q.amount*4).sort((a,b)=>b.start-a.start).slice(0,100);
  const ratios=(get:(t:Task)=>number|undefined)=>candidates.flatMap(t=>{const v=get(t);return v===undefined?[]:[v/volume(t,q.unit)!*q.amount];});
  const predict=(a:number[],rest?:number)=>{
   if(a.length<5)return {status:'Недостаточно данных',n:a.length,median:undefined,interval:undefined,fit:undefined,tasks:undefined};

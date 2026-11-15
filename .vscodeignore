@@ -9,3 +9,4 @@ tsconfig.json
 dist/test/**
 package-lock.json
 .github/**
+.vscode/settings.json

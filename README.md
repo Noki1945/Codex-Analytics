@@ -1,47 +1,42 @@
 # Codex Analytics
 
-A local-first VS Code extension for Codex session analytics, quota calibration, empirical forecasts and user-priced subscription scenarios. TypeScript, worker threads, SQLite (sql.js/WASM), no API key and no hosted backend.
+Расширение VS Code для локальной аналитики Codex. Сбор журналов, SQLite, проверка расхода лимитов, прогнозы по собственной истории и сравнение тарифных сценариев. Облачный сервер и API-ключ не нужны.
 
-[Русская документация](README.ru.md) · [Measurement limitations](docs/measurement.md)
+![Светлая тема, реальные пустые данные](docs/dashboard-light.png)
 
-![Dashboard, genuine empty state](docs/dashboard-dark.png)
+## Установка
 
-## Install
-
-Install Node.js 22 LTS to build from source, then run:
+Для сборки нужен Node.js 22 LTS:
 
 ```sh
 npm ci
 npm test
 npm run package
-code --install-extension codex-analytics-0.1.0.vsix
+code --install-extension codex-analytics-0.1.1.vsix
 ```
 
-Alternatively use **Extensions → … → Install from VSIX**. Open the Analytics Activity Bar icon or run **Codex Analytics: Open Dashboard** for a full-width panel. Configure `codexAnalytics.codexPath` to the full path to `codex.exe` if Codex is not on VS Code's PATH. Existing Codex authentication is reused for the official read-only App Server quota request. Importing session logs works offline.
+Готовый VSIX также устанавливается через **Extensions → … → Install from VSIX**. После установки выберите значок Analytics слева или команду **Codex Analytics: Open Dashboard** для широкой панели.
 
-## What works
+Настройки: `codexAnalytics.sessionsPath` — каталог журналов; `codexAnalytics.codexPath` — путь к Codex (при необходимости полный путь к `codex.exe`); `codexAnalytics.autoImport` — автоимпорт; `codexAnalytics.pollSeconds` — период опроса. По умолчанию журналы читаются из `CODEX_HOME/sessions` или `~/.codex/sessions`. Раздел Limits получает текущие лимиты через официальный Codex App Server с существующей авторизацией.
 
-- Incremental newline-delimited JSON import from `CODEX_HOME/sessions` (otherwise `~/.codex/sessions`), partial-line buffering, replacement/truncation detection and task ID deduplication.
-- Local cumulative token deltas, cached token accounting, observed task durations, tool/command/test counts, detected failures and repeated identical read/test calls.
-- Successful `apply_patch` summaries: added/deleted lines, file creation/change **events**, generated Unicode code points. Only explicitly confirmed successful patches contribute.
-- Multi-label tool-based classification, independent five-hour/week windows, reset/bucket/model/gap/overlap checks and percentage-point rounding bounds.
-- Mean, median, P10/P90, sample deviation, approximate Student-t mean confidence intervals, sample counts and normalized quotas by volume. Filters apply before aggregation.
-- History-based per-model/per-operation predictions with empirical intervals, fit frequencies and remaining similar-task counts (minimum five qualified observations). No synthetic fallback values.
-- Independent observed quota burn rates and exhaustion estimates when at least five intervals within the same current quota window exist.
-- Nine webview sections, VS Code theme variables, search/model/project/time filters, quota history plots, JSON/CSV export and manually priced finance scenarios.
+## Возможности
 
-## Trust and privacy
+Dashboard показывает наблюдения и сигналы повторных действий. Operations содержит группировки и нормализованный расход. Models и Projects сравнивают агрегаты. Forecast оценивает следующую задачу по однотипной истории. Limits показывает два независимых окна и историю процентов. Finance сравнивает введённые пользователем условия. History содержит задачи; Settings открывает настройки VS Code. Доступны поиск, фильтры периода, модели и проекта, экспорт CSV/JSON.
 
-Session logs contain sensitive text; the importer transiently reads them but persists only allowlisted aggregates, project hashes and technical IDs. It does not read authentication files, store prompts/source/commands, or send code to any service. SQLite is stored in the extension's global storage directory. Delete that directory to clear the database; turn off auto-import first. No telemetry is implemented.
+Измеряются токены и кэш, время задач, вызовы инструментов, команды, обнаруженные тесты и ошибки, повторные одинаковые чтения и тесты. Подтверждённые успешные патчи дают количество добавленных/удалённых строк и событий создания/изменения файлов. Статистика содержит среднее, медиану, перцентили, стандартное отклонение и приближённый 95% интервал среднего.
 
-Quota differences are account-level observations, **not exact per-operation billing**. Other clients can contribute even when local logs do not overlap. Percentages usually have one-point resolution, so differences are reported with ±1 percentage point bounds. Mixed or contaminated tasks are excluded from unit-cost training. API token prices are never equated with subscription credits. See the detailed [measurement contract](docs/measurement.md).
+Прогноз требует минимум 5 подходящих наблюдений на показатель. Он показывает эмпирические P10–P90, частоту попадания в остаток лимита и число похожих задач. Вероятности не являются гарантией. Для темпа расхода нужны 5 интервалов текущего окна. Входы сложности, размера проекта и будущих повторов пока не имеют обученных коэффициентов и явно не изменяют прогноз.
 
-## Development and publishing
+## Достоверность и ограничения
 
-`npm test` compiles and runs Node's test suite, including incremental import, quota resets/concurrency, Unicode and held-out prediction fixtures. `node scripts/screenshots.cjs` runs a headless Edge UI smoke test and regenerates genuine empty-state screenshots on Windows; on Linux install Playwright Chromium first. Screenshots contain no invented usage.
+Расход лимитов выражается в **процентных пунктах**. Разница округлённых процентов имеет погрешность ±1 п.п. Сброс, пересечение задач, смена модели, пропуски и смешанные операции исключают наблюдение из обучения удельного расхода. Активность на других устройствах может быть не видна локально.
 
-GitHub Actions builds/tests/packages on Windows and Linux and uploads VSIX artifacts. Download the installable alpha from [GitHub Releases](https://github.com/Noki1945/Codex-Analytics/releases).
+Число реально прочитанных файлов, их байты/строки/символы, число исправленных дефектов, семантические повторные попытки и фактический успех задачи не выводятся из произвольных shell-команд. Если данных нет, показывается «—» или «Недостаточно данных». Завершение turn не доказывает успешность результата. Классификация — эвристика инструментов; надёжно распознавать исправление ошибок, архитектуру и рефакторинг без отдельного подтверждения нельзя. [Подробный контракт измерений](docs/measurement.md).
 
-To publish in Marketplace: create your publisher in the [official management portal](https://marketplace.visualstudio.com/manage), replace the local `publisher` in `package.json`, add your actual repository URL and icon as desired, run `npm ci && npm test && npm run package`, inspect the package, then use `npx vsce login YOUR_PUBLISHER` and `npx vsce publish`. Do not commit credentials. Publishing is a separate explicit action.
+База хранит агрегаты, хэши проектов и технические идентификаторы в глобальном хранилище расширения. Промпты, код, команды, пароли и токены авторизации не сохраняются. Для очистки отключите автоимпорт и удалите каталог global storage расширения. Исходные журналы не изменяются.
 
-MIT licensed. This is an independent project, not an official OpenAI product.
+## Разработка и публикация
+
+`npm test` запускает компиляцию и автоматические проверки. GitHub Actions собирает проект на Windows/Linux и прикладывает VSIX. `node scripts/screenshots.cjs` проверяет все разделы в headless Edge и создаёт скриншоты настоящего пустого состояния. Локальное сравнение тарифов использует только ваши цены и оценку ёмкости; стоимость API не подменяет расход подписки.
+
+Готовые сборки доступны в [GitHub Releases](https://github.com/Noki1945/Codex-Analytics/releases). Для Marketplace создайте publisher, замените `publisher` в `package.json`, проверьте сборку, затем выполните `npx vsce login YOUR_PUBLISHER` и `npx vsce publish`. Подробности — в [английском README](README.md). Лицензия MIT. Независимый проект, не официальный продукт OpenAI.

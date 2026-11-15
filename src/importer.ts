@@ -14,7 +14,7 @@ export function limits(raw:any,at:number):Limits|undefined {
   const v:Window={used,minutes,reset,bucket};if(minutes===300)result.five=v;if(minutes===10080)result.week=v;
  }return result;
 }
-function tokens(x:any):Tokens|undefined {if(!x)return;const v={input:x.input_tokens,cached:x.cached_input_tokens,output:x.output_tokens};return Object.values(v).every(number)?v:undefined;}
+function tokens(x:any):Tokens|undefined {if(!x)return;const v={input:x.input_tokens,cached:x.cached_input_tokens,output:x.output_tokens};return Object.values(v).every(n=>number(n)&&Number.isSafeInteger(n))&&v.cached<=v.input?v:undefined;}
 export interface ParserState {session:string;project:string;model:string;current?:Task;baseline?:Tokens;total?:Tokens;limits?:Limits;tasks:Task[];calls:Record<string,{kind:string;fingerprint:string;patch?:Partial<Task>}>;seenCalls:string[];seenReads:string[];seenTests:string[];invalid:number}
 export function initialState(session:string):ParserState {return {session,project:'unknown',model:'unknown',tasks:[],calls:{},seenCalls:[],seenReads:[],seenTests:[],invalid:0};}
 export function consume(s:ParserState,e:any) {
