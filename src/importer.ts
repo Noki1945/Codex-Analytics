@@ -66,13 +66,13 @@ export function consume(s:ParserState,e:any) {
   t.end=at;t.complete=p.type!=='turn_aborted';s.tasks.push(t);s.current=undefined;
  }
 }
-export interface Checkpoint {offset:number;state:ParserState;mtime:number;prefix:string;prefixLength:number}
+export interface Checkpoint {offset:number;state:ParserState;mtime:number;prefix:string;prefixLength:number;generation?:number}
 export async function importFile(path:string,old?:Checkpoint):Promise<Checkpoint> {
  const info=await stat(path);let cp=old;
  // Prefix detects replacement even when the new file is larger. Raw bytes never enter storage.
  const prefixLength=old?.prefixLength??Math.min(256,info.size);
  let prefix='';if(prefixLength)for await(const chunk of createReadStream(path,{start:0,end:prefixLength-1}))prefix+=chunk.toString('base64');prefix=hash(prefix);
- if(!cp||info.size<cp.offset||cp.prefix!==prefix)cp={offset:0,state:initialState(hash(path)),mtime:0,prefix,prefixLength};
+ if(!cp||info.size<cp.offset||cp.prefix!==prefix)cp={offset:0,state:initialState(hash(path)),mtime:0,prefix,prefixLength,generation:(old?.generation??0)+1};
  if(cp.mtime===info.mtimeMs&&cp.offset===info.size)return cp;
  let pending=Buffer.alloc(0),position=cp.offset;
  for await(const chunk of createReadStream(path,{start:cp.offset})) {
@@ -80,6 +80,6 @@ export async function importFile(path:string,old?:Checkpoint):Promise<Checkpoint
   while((end=pending.indexOf(10))>=0){const line=pending.subarray(0,end).toString('utf8');position+=end+1;pending=pending.subarray(end+1);try{consume(cp.state,JSON.parse(line));}catch{cp.state.invalid++;if(cp.state.current)cp.state.current.gaps=true;}}
   if(pending.length>32*1024*1024)throw Error('Journal line exceeds 32 MiB safety bound');
  }
- return {offset:position,state:cp.state,mtime:info.mtimeMs,prefix,prefixLength};
+ return {offset:position,state:cp.state,mtime:info.mtimeMs,prefix,prefixLength,generation:cp.generation};
 }
 export async function* journals(dir:string):AsyncGenerator<string> {for(const e of await readdir(dir,{withFileTypes:true})){const p=join(dir,e.name);if(e.isDirectory())yield* journals(p);else if(e.isFile()&&e.name.endsWith('.jsonl'))yield p;}}

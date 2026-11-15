@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,appendFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {calibrate,classify,textSize,tokenDelta,stats,forecast,finalize,Task,finance,normalized,burn} from '../src/core';
+import {calibrate,classify,textSize,tokenDelta,stats,forecast,finalize,Task,finance,normalized,burn,wilson,backtest} from '../src/core';
 import {csv} from '../src/export';
 import {consume,initialState,importFile,limits} from '../src/importer';
 const w=(used:number,reset=100)=>({used,reset,minutes:300,bucket:'codex'});
@@ -26,3 +26,5 @@ test('burn prediction excludes reset transitions and expired windows',()=>{const
 test('burn weights unequal intervals by duration and rejects stale snapshots',()=>{let at=1000000;const samples=[{at,five:w(10,100000)}];for(const [hours,delta] of [[1,1],[.02,1],[.02,1],[.02,1],[.02,1]]){at+=hours*3600000;samples.push({at,five:w(samples.at(-1)!.five.used+delta,100000)});}assert.ok(Math.abs(burn(samples,'five',at)!.perHour!-5/1.08)<1e-8);assert.equal(burn(samples,'five',at+300001)?.n,0);});
 test('forecasts reject extreme extrapolation and invalid complexity',()=>{const data=finalize(Array.from({length:8},(_,i)=>task(i)));assert.equal(forecast(data,{model:'m',category:'read',unit:'readChars',amount:1000000,retries:0,complexity:1}).five.n,0);assert.throws(()=>forecast(data,{model:'m',category:'read',unit:'task',amount:1,retries:NaN,complexity:1}));});
 test('deduplication retains complete observations and detects nested overlaps',()=>{const a=task(),b=task(1),c=task(2);a.end=1000;b.start=10;b.end=20;c.start=30;c.end=40;const duplicate={...a,complete:false,end:undefined};const result=finalize([a,b,c,duplicate]);assert.equal(result.length,3);assert.ok(result.every(t=>t.five?.quality==='aggregate'));assert.ok(result.find(t=>t.id===a.id)!.complete);});
+test('quota predictions include rounding and small sample uncertainty',()=>{const data=finalize(Array.from({length:8},(_,i)=>task(i)));const p=forecast(data,{model:'m',category:'read',unit:'task',amount:1,retries:0,complexity:1},{five:2});assert.equal(p.five.fit,0);assert.deepEqual(p.five.interval,[1,3]);assert.ok(p.five.fitInterval![1]>0);assert.equal(p.five.tasks,0);assert.ok(wilson(5,5)![0]<1);});
+test('temporal holdout detects future cost increases without training on them',()=>{const data=Array.from({length:10},(_,i)=>{const t=task(i);if(i>=7)t.after!.five=w(20);return t;});const r=backtest(data,{model:'m',category:'read',unit:'task',amount:1,retries:0,complexity:1},'five');assert.equal(r.n,3);assert.equal(r.mae,8);assert.ok(r.coverage!<1);});

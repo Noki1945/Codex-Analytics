@@ -36,4 +36,12 @@ Quota burn now uses total observed percentage-point increase divided by total ob
 
 Duplicate task records prefer a completed observation over an incomplete copy. Overlap detection uses sorted intervals and a running maximum end time, avoiding the previous full pairwise scan. Token counters must be nonnegative safe integers and cached input cannot exceed total input.
 
+### Alpha 3 refinements
+
+Quota prediction bounds include the observed rounding bounds. Fit frequency counts historical upper cost bounds that fit, with a Wilson interval describing finite-sample uncertainty. Similar-task capacity uses the empirical P90 upper cost, not the median. Only fresh, unexpired App Server snapshots supply remaining quotas.
+
+Temporal validation evaluates up to 30 later tasks from the latest 500 eligible observations. Training records must finish before the held-out task starts; at least five compatible observations are required. MAE and empirical coverage describe this historical check, not guaranteed future accuracy. This is a bounded rolling evaluation, not a claim of independent scientific validation.
+
+Completed tasks now occupy separate SQLite rows, while checkpoints retain only incremental parser state. Legacy databases receive a one-time local backup before migration. Writes use an exclusive PID lock; an active competing writer receives an explicit error. An abandoned lock is recovered only when its recorded process is gone. History displays 50 rows per page. A synthetic 10,000-task storage benchmark is available through `node scripts/benchmark.cjs`; its results are specific to the execution machine and do not measure forecast accuracy. The database and complete aggregate dataset are still loaded in memory, so unbounded archives remain outside the tested scale.
+
 No reliable programming-language or semantic complexity filter exists without a trusted source. No semantic defect count, task-success verifier, causal operation-cost attribution, automatic official pricing feed, real retry-cost allocation or reset purchasing is implemented. These are explicitly unavailable rather than fabricated. A remote GitHub repository and Marketplace publication require account access and a real publisher identity.

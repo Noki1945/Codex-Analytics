@@ -85,15 +85,38 @@ export function normalized(tasks:Task[],key:'five'|'week',unit:Unit,scale=1) {
  return stats(tasks.filter(t=>t[key]?.quality==='bounded').flatMap(t=>{const d=volume(t,unit),v=t[key]?.value;return d&&v!==undefined?[v/d*scale]:[];}));
 }
 export interface ForecastInput {model:string;category:Category;unit:Unit;amount:number;project?:string;retries:number;complexity:number;projectSize?:number}
+export function wilson(successes:number,n:number):[number,number]|undefined {
+ if(!n)return;const z=1.96,p=successes/n,d=1+z*z/n,center=(p+z*z/(2*n))/d,margin=z*Math.sqrt(p*(1-p)/n+z*z/(4*n*n))/d;return [Math.max(0,center-margin),Math.min(1,center+margin)];
+}
+export function backtest(tasks:Task[],q:ForecastInput,key:'five'|'week') {
+ const calibrated=tasks.every(t=>t[key])?tasks:finalize(tasks.map(t=>({...t})));
+ const history=calibrated.filter(t=>t.complete&&!t.gaps&&!t.modelChanged&&t.model===q.model&&t.categories.length===1&&t.categories[0]===q.category&&(!q.project||q.project===t.project)&&t[key]?.quality==='bounded'&&(volume(t,q.unit)??0)>0).sort((a,b)=>a.start-b.start).slice(-500);
+ const errors:number[]=[],hits:boolean[]=[];
+ // Each prediction uses only tasks completed before the held-out task starts.
+ for(const held of history.slice(Math.max(5,Math.floor(history.length*.7),history.length-30))){
+  const amount=volume(held,q.unit)!;
+  const train=history.filter(t=>(t.end??Infinity)<held.start&&(volume(t,q.unit)??0)>=amount/4&&(volume(t,q.unit)??0)<=amount*4).slice(-100);
+  if(train.length<5)continue;
+  const values=train.map(t=>t[key]!.value!/volume(t,q.unit)!*amount),actual=held[key]!.value!;
+  const low=quantile(train.map(t=>(t[key]!.low??t[key]!.value!)/volume(t,q.unit)!*amount),.1)!;
+  const high=quantile(train.map(t=>(t[key]!.high??t[key]!.value!)/volume(t,q.unit)!*amount),.9)!;
+  errors.push(Math.abs(quantile(values,.5)!-actual));hits.push(actual>=low&&actual<=high);
+ }
+ return {n:errors.length,mae:stats(errors)?.mean,coverage:errors.length?hits.filter(Boolean).length/errors.length:undefined};
+}
 export function forecast(tasks:Task[],q:ForecastInput,remaining?:{five?:number;week?:number}) {
- if(!Number.isFinite(q.amount)||q.amount<=0||!Number.isFinite(q.retries)||q.retries<0||!Number.isFinite(q.complexity)||q.complexity<=0||q.complexity>5) throw Error('Некорректные параметры прогноза');
+ if(!Number.isFinite(q.amount)||q.amount<=0||q.amount>Number.MAX_SAFE_INTEGER||!Number.isSafeInteger(q.retries)||q.retries<0||!Number.isFinite(q.complexity)||q.complexity<=0||q.complexity>5) throw Error('Некорректные параметры прогноза');
+ if(remaining&&Object.values(remaining).some(x=>x!==undefined&&(!Number.isFinite(x)||x<0||x>100)))throw Error('Некорректный остаток лимита');
  const candidates=tasks.filter(t=>t.complete&&!t.gaps&&!t.modelChanged&&t.model===q.model&&t.categories.length===1&&t.categories[0]===q.category&&(!q.project||t.project===q.project)&& (volume(t,q.unit)??0)>=q.amount/4&&(volume(t,q.unit)??0)<=q.amount*4).sort((a,b)=>b.start-a.start).slice(0,100);
  const ratios=(get:(t:Task)=>number|undefined)=>candidates.flatMap(t=>{const v=get(t);return v===undefined?[]:[v/volume(t,q.unit)!*q.amount];});
- const predict=(a:number[],rest?:number)=>{
-  if(a.length<5)return {status:'Недостаточно данных',n:a.length,median:undefined,interval:undefined,fit:undefined,tasks:undefined};
-  const s=stats(a)!;return {status:'Эмпирический прогноз',...s,interval:[s.p10,s.p90],fit:rest===undefined?undefined:a.filter(v=>v<=rest).length/a.length,tasks:rest===undefined||s.median<=0?undefined:Math.floor(rest/s.median)};
+ const predict=(a:number[],rest?:number,lower=a,upper=a)=>{
+  if(a.length<5)return {status:'Недостаточно данных',n:a.length,median:undefined,interval:undefined,fit:undefined,fitInterval:undefined,tasks:undefined};
+  const s=stats(a)!,successes=rest===undefined?undefined:upper.filter(v=>v<=rest).length;
+  const interval=[quantile(lower,.1)!,quantile(upper,.9)!];
+  return {status:'Эмпирический прогноз',...s,interval,fit:successes===undefined?undefined:successes/a.length,fitInterval:successes===undefined?undefined:wilson(successes,a.length),tasks:rest===undefined||interval[1]<=0?undefined:Math.floor(rest/interval[1])};
  };
- return {five:predict(ratios(t=>t.five?.quality==='bounded'?t.five.value:undefined),remaining?.five),week:predict(ratios(t=>t.week?.quality==='bounded'?t.week.value:undefined),remaining?.week),tokens:predict(ratios(t=>t.tokens?t.tokens.input+t.tokens.output:undefined)),durationMs:predict(ratios(t=>t.end===undefined?undefined:t.end-t.start)),notes:['Intervals are empirical P10–P90, not a guarantee.','Complexity, project size and future retries are not causally calibrated; no invented multipliers are applied.']};
+ const quota=(key:'five'|'week')=>predict(ratios(t=>t[key]?.quality==='bounded'?t[key]!.value:undefined),remaining?.[key],ratios(t=>t[key]?.quality==='bounded'?t[key]!.low:undefined),ratios(t=>t[key]?.quality==='bounded'?t[key]!.high:undefined));
+ return {five:quota('five'),week:quota('week'),tokens:predict(ratios(t=>t.tokens?t.tokens.input+t.tokens.output:undefined)),durationMs:predict(ratios(t=>t.end===undefined?undefined:t.end-t.start)),validation:{five:backtest(tasks,q,'five'),week:backtest(tasks,q,'week')},notes:['Диапазоны P10–P90 учитывают округление лимитов. Оценка числа задач использует верхнюю границу, а не медиану.','Вероятность попадания эмпирическая; интервал Уилсона показывает неопределённость малой выборки.','Сложность, размер проекта и будущие повторы пока не имеют обученных коэффициентов.']};
 }
 export function insights(tasks:Task[]) { const s=stats(tasks.flatMap(t=>t.tokens?[t.tokens.input+t.tokens.output]:[]));return tasks.flatMap(t=>{const out:string[]=[];if(t.repeatedReads)out.push(`Повторных чтений: ${t.repeatedReads}`);if(t.repeatedTests)out.push(`Повторных тестов: ${t.repeatedTests}`);if(t.failures>=3)out.push(`Неудачных вызовов: ${t.failures}`);if(s&&s.n>=10&&t.tokens&&t.tokens.input+t.tokens.output>s.mean+2*s.sd)out.push('Расход токенов выше среднего более чем на 2σ');return out.map(message=>({id:t.id,message}));}); }
 export function finance(monthlyTasks:number,plans:{name:string;price:number;includedTasks:number;extraPerTask:number}[]) {if(!Number.isFinite(monthlyTasks)||monthlyTasks<0)throw Error('Invalid demand');return plans.map(p=>{if([p.price,p.includedTasks,p.extraPerTask].some(x=>!Number.isFinite(x)||x<0))throw Error('Invalid pricing');return {...p,total:p.price+Math.max(0,monthlyTasks-p.includedTasks)*p.extraPerTask};});}

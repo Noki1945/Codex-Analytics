@@ -1,5 +1,7 @@
 # Codex Analytics
 
+**[Пошаговая инструкция установки и запуска](START.ru.md)**
+
 Расширение VS Code для локальной аналитики Codex. Сбор журналов, SQLite, проверка расхода лимитов, прогнозы по собственной истории и сравнение тарифных сценариев. Облачный сервер и API-ключ не нужны.
 
 ![Светлая тема, реальные пустые данные](docs/dashboard-light.png)
@@ -12,7 +14,7 @@
 npm ci
 npm test
 npm run package
-code --install-extension codex-analytics-0.1.1.vsix
+code --install-extension codex-analytics-0.1.2.vsix
 ```
 
 Готовый VSIX также устанавливается через **Extensions → … → Install from VSIX**. После установки выберите значок Analytics слева или команду **Codex Analytics: Open Dashboard** для широкой панели.

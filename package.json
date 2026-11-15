@@ -2,7 +2,7 @@
   "name": "codex-analytics",
   "displayName": "Codex Analytics",
   "description": "Локальная аналитика операций Codex и прогнозирование лимитов",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "codex-analytics-local",
   "license": "MIT",
   "engines": {
