@@ -1,5 +1,9 @@
 # Measurement contract (v0.1)
 
+## Beta 0.2 additions
+
+Forecast and report computations execute in the worker thread using the last loaded aggregate dataset, with correlated request IDs. The interface's selected task IDs define the forecast/report/export population. Additional folders add sources to the same local history; source records remain available after later scans of the default directory. Standard scans optionally include `archived_sessions`; a missing optional archive is ignored, while other missing directories appear in import diagnostics. Filters and form values persist through VS Code webview state, separate from the analytics database. Export contains only selected task IDs when the interface supplies them.
+
 ## Sources
 
 Protocol verified against the locally installed Codex CLI `0.169.0-alpha.11.1` generated TypeScript bindings and the [official App Server documentation](https://learn.chatgpt.com/docs/app-server). `initialize`, `initialized`, then `account/rateLimits/read` are the only outgoing protocol methods. A separate stdio process does not observe other clients' turn events; existing tasks are collected from local rollout JSONL journals. Local journal schemas are version-dependent; unknown records are ignored. The importer handles `session_meta`, `turn_context`, `event_msg` task boundaries/token counts, and function/custom tool calls/results.

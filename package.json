@@ -2,7 +2,7 @@
   "name": "codex-analytics",
   "displayName": "Codex Analytics",
   "description": "Локальная аналитика операций Codex и прогнозирование лимитов",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "codex-analytics-local",
   "license": "MIT",
   "engines": {
@@ -40,6 +40,10 @@
       {
         "command": "codexAnalytics.refresh",
         "title": "Codex Analytics: Refresh History"
+      },
+      {
+        "command": "codexAnalytics.importFolder",
+        "title": "Codex Analytics: Import History Folder"
       }
     ],
     "viewsContainers": {
@@ -81,6 +85,11 @@
           "type": "number",
           "default": 60,
           "minimum": 15
+        },
+        "codexAnalytics.includeArchived": {
+          "type": "boolean",
+          "default": true,
+          "description": "Также импортировать ~/.codex/archived_sessions при стандартном пути журналов."
         }
       }
     }
