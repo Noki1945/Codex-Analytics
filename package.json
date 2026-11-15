@@ -1,0 +1,96 @@
+{
+  "name": "codex-analytics",
+  "displayName": "Codex Analytics",
+  "description": "Local Codex operation analytics and evidence-based quota forecasts",
+  "version": "0.1.0",
+  "publisher": "codex-analytics-local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:codexAnalytics.dashboard"
+  ],
+  "scripts": {
+    "compile": "tsc && node scripts/copy.cjs",
+    "test": "npm run compile && node --test dist/test/*.test.js",
+    "package": "npm run compile && vsce package --no-dependencies --no-rewrite-relative-links --allow-missing-repository"
+  },
+  "dependencies": {
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/sql.js": "^1.4.9",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.6.0",
+    "playwright": "^1.65.1",
+    "typescript": "^5.8.3"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "codexAnalytics.open",
+        "title": "Codex Analytics: Open Dashboard"
+      },
+      {
+        "command": "codexAnalytics.refresh",
+        "title": "Codex Analytics: Refresh History"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codexAnalytics",
+          "title": "Codex Analytics",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codexAnalytics": [
+        {
+          "type": "webview",
+          "id": "codexAnalytics.dashboard",
+          "name": "Analytics"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codex Analytics",
+      "properties": {
+        "codexAnalytics.sessionsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Codex sessions directory; empty uses CODEX_HOME/sessions or ~/.codex/sessions."
+        },
+        "codexAnalytics.codexPath": {
+          "type": "string",
+          "default": "codex",
+          "description": "Path to the Codex executable."
+        },
+        "codexAnalytics.autoImport": {
+          "type": "boolean",
+          "default": true
+        },
+        "codexAnalytics.pollSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noki1945/Codex-Analytics.git"
+  },
+  "homepage": "https://github.com/Noki1945/Codex-Analytics",
+  "bugs": {
+    "url": "https://github.com/Noki1945/Codex-Analytics/issues"
+  }
+}

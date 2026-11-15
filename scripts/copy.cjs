@@ -1,0 +1,1 @@
+const fs=require('node:fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('node_modules/sql.js/dist/sql-wasm.wasm','dist/sql-wasm.wasm');fs.copyFileSync('node_modules/sql.js/dist/sql-wasm.js','dist/sql-wasm.js');fs.writeFileSync('dist/extension.js',"module.exports = require('./src/extension.js');\n");

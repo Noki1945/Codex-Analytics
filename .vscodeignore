@@ -1,0 +1,11 @@
+.tools/**
+node_modules/**
+src/**
+test/**
+scripts/**
+.git/**
+*.sqlite
+tsconfig.json
+dist/test/**
+package-lock.json
+.github/**
