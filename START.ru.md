@@ -2,7 +2,7 @@
 
 ## Для обычного использования
 
-1. Откройте [страницу релизов](https://github.com/Noki1945/Codex-Analytics/releases) и скачайте файл `codex-analytics-0.2.1.vsix` из раздела **Assets**.
+1. Откройте [страницу релизов](https://github.com/Noki1945/Codex-Analytics/releases) и скачайте файл `codex-analytics-1.0.0.vsix` из раздела **Assets**.
 2. Запустите Visual Studio Code.
 3. Откройте **Расширения** сочетанием **Ctrl+Shift+X**. Нажмите **…** вверху панели и выберите **Установить из VSIX… / Install from VSIX…**.
 4. Выберите скачанный файл. Если VS Code предложит перезапустить расширения, нажмите соответствующую кнопку.

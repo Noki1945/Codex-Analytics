@@ -16,7 +16,7 @@
 npm ci
 npm test
 npm run package
-code --install-extension codex-analytics-0.2.1.vsix
+code --install-extension codex-analytics-1.0.0.vsix
 ```
 
 Готовый VSIX также устанавливается через **Extensions → … → Install from VSIX**. После установки выберите значок Analytics слева или команду **Codex Analytics: Open Dashboard** для широкой панели.
