@@ -14,7 +14,7 @@ Install Node.js 22 LTS to build from source, then run:
 npm ci
 npm test
 npm run package
-code --install-extension codex-analytics-0.2.0.vsix
+code --install-extension codex-analytics-0.2.1.vsix
 ```
 
 Alternatively use **Extensions → … → Install from VSIX**. Open the Analytics Activity Bar icon or run **Codex Analytics: Open Dashboard** for a full-width panel. Configure `codexAnalytics.codexPath` to the full path to `codex.exe` if Codex is not on VS Code's PATH. Existing Codex authentication is reused for the official read-only App Server quota request. Importing session logs works offline.

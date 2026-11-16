@@ -11,7 +11,7 @@ export function activate(context:vscode.ExtensionContext) {
  let tasks:Task[]=[],status='История ещё не импортирована',busy=false;
  let liveLimits:Limits|undefined;
  const output=vscode.window.createOutputChannel('Codex Analytics');context.subscriptions.push(output);
- const worker=new Worker(join(context.extensionPath,'dist/src/worker.js'),{workerData:{storage:context.globalStorageUri.fsPath,wasm:join(context.extensionPath,'dist/sql-wasm.wasm')}});
+ const worker=new Worker(join(context.extensionPath,'dist/src/worker.js'),{workerData:{storage:context.globalStorageUri.fsPath,wasm:join(context.extensionPath,'dist/sql-wasm.wasm'),indexPath:join(process.env.CODEX_HOME||join(homedir(),'.codex'),'session_index.jsonl')}});
  context.subscriptions.push({dispose:()=>{void worker.terminate();}});
  const views=new Set<vscode.Webview>();
  const config=()=>vscode.workspace.getConfiguration('codexAnalytics');
@@ -19,7 +19,7 @@ export function activate(context:vscode.ExtensionContext) {
  const pending=new Map<number,{resolve:(value:any)=>void;reject:(error:Error)=>void}>();
  const request=(mode:string,payload:unknown)=>new Promise<any>((resolve,reject)=>{const id=++sequence;pending.set(id,{resolve,reject});worker.postMessage({id,mode,payload});});
  const update=()=>{for(const v of views)void v.postMessage({type:'data',tasks,status});};
- worker.on('message',m=>{if(m.type==='result'){const p=pending.get(m.id);pending.delete(m.id);if(m.error)p?.reject(Error(m.error));else p?.resolve(m.result);return;}busy=false;if(m.error){status=`Ошибка импорта: ${m.error}`;output.appendLine(status);}else{tasks=m.tasks;const issues:string[]=m.issues??[];status=`Файлов журналов: ${m.files} · Задач: ${tasks.length} · Ошибок файлов: ${issues.length} · ${new Date().toLocaleTimeString()}`;issues.forEach(x=>output.appendLine(x));}update();});
+ worker.on('message',m=>{if(m.type==='result'){const p=pending.get(m.id);pending.delete(m.id);if(m.error)p?.reject(Error(m.error));else p?.resolve(m.result);return;}busy=false;if(m.error){status=`Ошибка импорта: ${m.error}`;output.appendLine(status);}else{tasks=m.tasks.map((t:Task)=>({...t,title:m.titles?.[t.session]}));const issues:string[]=m.issues??[];status=`Файлов журналов: ${m.files} · Ходов: ${tasks.length} · Ошибок файлов: ${issues.length} · ${new Date().toLocaleTimeString()}`;issues.forEach(x=>output.appendLine(x));}update();});
  worker.on('error',e=>{busy=false;for(const p of pending.values())p.reject(e);pending.clear();status=`Ошибка рабочего потока: ${e.message}`;output.appendLine(status);update();});
  function refresh(folder?:string){if(busy)return;busy=true;status='Чтение локальных журналов…';update();const home=process.env.CODEX_HOME||join(homedir(),'.codex'),custom=config().get<string>('sessionsPath'),directory=folder||custom||join(home,'sessions'),archive=join(home,'archived_sessions');const directories=[directory];if(!folder&&!custom&&config().get('includeArchived',true))directories.push(archive);worker.postMessage({id:++sequence,directories,optionalDirectory:archive});}
  async function importFolder(){const folders=await vscode.window.showOpenDialog({canSelectFolders:true,canSelectFiles:false,canSelectMany:false,openLabel:'Импортировать журналы Codex'});if(folders?.[0])refresh(folders[0].fsPath);}

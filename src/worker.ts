@@ -4,6 +4,7 @@ import {journals,importFile,hash} from './importer';
 import {Task,forecast} from './core';
 import {report} from './reports';
 import {stat} from 'node:fs/promises';
+import {readTitles} from './titles';
 let queue=Promise.resolve();
 let cached:Task[]=[];
 parentPort!.on('message',m=>{queue=queue.then(async()=>{
@@ -14,7 +15,7 @@ parentPort!.on('message',m=>{queue=queue.then(async()=>{
  let store:Store|undefined;
  try {
   store=await Store.open(workerData.storage,workerData.wasm);
-  if(m.mode==='load'){cached=store.tasks();parentPort!.postMessage({id:m.id,tasks:cached,files:store.sources(),issues:[]});return;}
+  if(m.mode==='load'){cached=store.tasks();const titles=workerData.indexPath?await readTitles(workerData.indexPath):{};parentPort!.postMessage({id:m.id,tasks:cached,files:store.sources(),issues:[],titles});return;}
   let files=0;const issues:string[]=[];
   for(const directory of m.directories??[m.directory]){
    try{
@@ -22,7 +23,7 @@ parentPort!.on('message',m=>{queue=queue.then(async()=>{
     for await(const path of journals(directory)){const id=hash(path);try{store.put(id,await importFile(path,store.get(id)));files++;}catch(e){issues.push(`Журнал ${id.slice(0,8)}: ${e instanceof Error?e.message:String(e)}`);}}
    }catch(e){issues.push(`Каталог ${hash(directory).slice(0,8)}: ${e instanceof Error?e.message:String(e)}`);}
   }
-  await store.save();cached=store.tasks();parentPort!.postMessage({id:m.id,tasks:cached,files,issues});
+  await store.save();cached=store.tasks();const titles=workerData.indexPath?await readTitles(workerData.indexPath):{};parentPort!.postMessage({id:m.id,tasks:cached,files,issues,titles});
  }
  catch(e){parentPort!.postMessage({id:m.id,error:e instanceof Error?e.message:String(e)});}finally{store?.close();}
  });});

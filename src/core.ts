@@ -4,7 +4,7 @@ export interface Window { used: number; reset: number; minutes: number; bucket: 
 export interface Limits { five?: Window; week?: Window; at: number }
 export interface Tokens { input: number; cached: number; output: number }
 export interface Task {
- id: string; session: string; project: string; model: string; start: number; end?: number;
+ id: string; session: string; project: string; model: string; start: number; end?: number; title?:string;
  categories: Category[]; tokens?: Tokens; before?: Limits; after?: Limits;
  tools: number; commands: number; tests: number; failures: number; retries?: number;
  readChars?: number; readLines?: number; readBytes?: number; readFiles?: number;
